@@ -180,9 +180,121 @@ DML通常由用户或应用程序员使用，访问近授权的数据库。
 
 ### SQL语言的增-删-改
 
+> 元组新增Insert：新增一个或一些元组到数据库中的Table中
+>
+> 元组更新Update：对某些元组中的某些属性值进行重新设定
+>
+> 元组删除Delete：删除某些元组
+
+SQL-DML既能单一记录操作，也能对记录集合进行批更新操作。
+
+#### 元组新增Insert命令
+
+> 单一元组新增命令形式：插入一条指定元组值的元组
+>
+> ​				insert into 表名 [(列名[,列名]...)]  value (值[,值]...);
+>
+> 批量数据新增命令形式：插入子查询结果中的若干条元组。待插入的元组由子查询给出。
+>
+> ​				insert into 表名 [(列名[,列名]...)]  子查询;
+>
+> 示例：
+>
+> Insert Into Teacher (Tnumber, Tname, Dnumber, Salary)  value ("005", "张三", "03", "1250");
+>
+> Insert Into **St (Snumber, Sname)**  Select **Snumber, Sname**  From **Student**  Where **Sname like '%伟'**;
+
+#### 元组删除Delete命令
+
+> 元组删除Delete命令：删除满足指定条件的元组
+>
+> ​				Delete From 表名 [Where 条件表达式]；
+>
+> 如果Where条件省略，则删除所有元组。
+>
+> 示例：删除自动控制系的所有同学。
+>
+> Delete From **Student** Where **Dnumber** in (**Select Dnumber From Dept Where Dname = '自动控制'**);
+>
+> 删除有四门不及格课程的所有同学
+>
+> Delete From **Student** Where **Snumber** in (Select **Snumber** From **SC** Where **Score < 60** Group by **Snumber** Having **Count(*) >= 4**);
+
+#### 元组修改Update命令
+
+> 元组更新Update命令：用指定要求的值更新指定表中满足指定条件的元组的指定列的值。
+>
+> Update 表名 Set 列名 = 表达式|（子查询）[[， 列名=表达式|（子查询）]...]  [Where 条件表达式]；
+>
+> 如果Where条件省略，则更新所有的元组。
+>
+> 示例：将所有教师工资上调5%
+>
+> Update Teacher Set Salary = Salary * 1.05;
+>
+> 将所有计算机系的教师工资上调10%
+>
+> Update **Teacher** Set **Salary = Salary * 1.1** Where **Dnumber** in (Select **Dnumber** From **Dept** Where **Dname  = '计算机'** );
 
 
 
+### SQL语言DDL之撤销与修改
+
+修正数据库：修正数据库的定义，主要是修正表的定义
+
+修正基本表的定义
+
+> alter table tablename
+>
+> [add  {colname datatype, ... }]  //增加新列
+>
+> [drop {完整性约束名}]  //删除完整性约束
+>
+> [modify {colname dataype, ...}]  //修改列定义
+>
+> 示例：在学生表**Student**(**Snumber** char(8) not null, **Sname** char(8), **Ssex** char(2)， **Sage** integer, **Dnumber** char(2), **Sclass** char(6)) 基础上增加两列Saddr，PID：
+>
+> Alter Table **Student** Add **Saddr char(40), PID char(18)**;  
+>
+> 将上例表中Sname列的数据类型增加两个字符
+>
+> Alter Table **Student** Modify **Sname char(10)**;
+>
+> 删除学生姓名必须取唯一值的约束
+>
+> Alter Table **Student** Dorp Unique (Sname);
+
+撤销基本表
+
+> Drop Table 表名
+
+* 注意，SQL-Delete语句只是删除表中的元组，而册小基本表Drop Table的操作是册小包括表格式、表中所有元组、由该表到处的视图等相关的所有内容，所以使用要特别注意。
+
+同样可以撤销数据库
+
+> Drop Database 数据库名
+
+### SQL语言DDL之指定与关闭
+
+指定当前数据库
+
+> Use 数据库名；
+
+关闭当前数据库
+
+> Close 数据库名；
+
+ ### SQL语言DDL之其他
+
+数据库授权
+
+>语法形式：
+>
+>Grant 权限 on 表名 to 用户名；
+>
+>权限有：Select，Update，Insert，Delete，Exec，Dri;
+>
+>对呗授权的用户，要先称为该数据库的使用者，即要把用户加到数据库里，才能授权。
 
 
 
