@@ -314,11 +314,11 @@ SQL-DML既能单一记录操作，也能对记录集合进行批更新操作。
 
 > 三种类型的子查询：（NOT）IN-子查询；$\theta$-Some/$\theta$-All子查询；（NOT）EXISTS子查询。
 
-#### （NOT）IN子查询
+#### (NOT) IN子查询
 
 > 基本语法：
 >
-> 表达式 [Not] In (子查询)
+> ​				表达式 [Not] In (子查询)
 >
 > 语法中，表达式的最简单形式就是列名或常数。
 >
@@ -339,6 +339,139 @@ SQL-DML既能单一记录操作，也能对记录集合进行批更新操作。
 > 示例：求学过001号课程同学的姓名
 >
 > Select **Sname** From **Student Stud** Where Snumber (Select Snumber From SC Where Snumber=**Stud**.Snumber and Cnumber=’001‘)；
+
+
+
+#### $\theta$-Some/$\theta$-All子查询
+
+> 基本语法：
+>
+> ​				表达式  $\theta$ Some （子查询）
+>
+> ​				表达式  $\theta$ All  （子查询）
+>
+> 语法中，$\theta$是比较运算符: `<`, `>`, `>=`, `<=`, `=`, `<>`。
+>
+> 语义：将表达式的值与子查询的结果进行比较：
+>
+> * 如果表达式的值至少与子查询结果的某一值相比较满足比较关系，则表达式   $\theta$ Some （子查询）的结果便为真。
+> * 如果表达式的值与子查询结果的所有值相比较满足比较关系，则表达式   $\theta$ All （子查询）的结果便为真。
+>
+> 示例：找出工资最低的教师姓名。
+>
+> Select **Tname** From **Teacher** Where **Salary <= all (Select Salary From Teacher);**
+>
+> 找出001号课程成绩不是最高的所有学生的学号。
+>
+> Select **Snumber** From **SC** Where **Cnumber = "001**" and **Score < Some (Select Score From SC Where Cnumber =  "001")**;
+
+需要注意的“等价变换”：
+
+> 如下两种表达方式含义是相同的
+>
+> ​		表达式 **= Some** (子查询)
+>
+> ​		表达式 **in** (子查询)
+>
+> 另外
+>
+> ​		表达式 **<> all** (子查询)
+>
+> ​		表达式 **not in** (子查询)
+>
+> 是等价的。
+
+
+
+#### (NOT) EXISTS子查询
+
+> 基本语法：
+>
+> ​			[not] Exists (子查询)
+>
+> 语义：子查询结果中由于元组存在
+>
+> 示例：检索选修了赵三老师主讲课程的所有同学的姓名
+>
+> Select DISTINCT **Sname** From **Student** Where  exists (Select ***** From **SC, Course, Teacher** Where **SC.Cnumber = Course.Cnumber and SC.Snumber = Student.Snumber and Course.Tnumber = Teacher.Tnumber and Tname = "赵三"**);
+>
+> 然而not exists却可以实现很多新功能，
+>
+> 示例：检索学过001号教师主讲的所有课程的所有同学的姓名
+>
+> ```sql
+> SELECT Sname From Student
+> Where not exists  --不存在
+> 	(
+>         SELECT * From Course --有一门001教师的主讲课程
+>         Where Course.Tnumber='001' and not exists --该同学没学过
+>         (
+>         	SELECT * From SC
+>             Where Snumber=Student.Snumber and Cnumber=Course.Cnumber
+>         )
+> 	);
+> ```
+>
+> 上述语句的意思：不存在有一门001号教师主讲的课程该学生没有学过
+
+
+
+## SQL语言的结果计算与聚集计算
+
+
+
+### 结果计算
+
+> Select-From-Where语句中，Select子句后面不仅可是列名，而且可是一些计算表达式或聚集函数，表明再投影的同时直接进行一些运算
+>
+> ```sql
+> Select 列名|expr|agfunc(列名) [[, 列名|expr|agfunc(列名)]...]
+> From 表名1 [,表名2...]
+> [Where 检索条件]
+> ```
+>
+> * expr可以是常量、列名或由常量、列名、特殊函数及算术运算符构成的算术运算式。特殊函数的使用需要结合子DBMS的说明书。
+> * agfunc()是一些聚集函数。
+
+示例：求有差额（差额>0）的任意两位教师的薪水差额
+
+```sql
+Select T1.Tname as TR1, T2.Tname as TR2, t1.Salary-T2.Salary
+From Teacher T1, Teacher T2
+Where T1.Salary > T2.Salary;
+```
+
+示例：依据学生年龄求出学生的出生年份，当前是2022年
+
+```sql
+Select S.Snumber, S.Sname, 2022-S.Sage+1 as Syear
+From Student S;
+```
+
+
+
+### 聚集函数
+
+> * SQL提供了5个作用再简单列值集合上的内置聚集函数agfunc，分别是：
+>
+>   COUNT（求个数）、SUM（求和）、AVG（求平均）、MAX（求最大）、MIN（求最小）
+
+示例：求教师的工资总额。
+
+```sql
+Select Sum(Salary) From Teacher;
+```
+
+示例：求数据库课程的平均成绩
+
+```sql
+Select AVG(Score) From Course C, SC 
+Where C.Cname='数据库' and C.Cnumber = SC.Cnumber
+```
+
+
+
+### 分组查询与分组过滤
 
 
 
