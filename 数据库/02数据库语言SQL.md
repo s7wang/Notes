@@ -298,11 +298,9 @@ SQL-DML既能单一记录操作，也能对记录集合进行批更新操作。
 
 
 
-## SQL语言之复杂查询与视图
+## SQL语言之复杂查询
 
 
-
-### SQL语言复杂查询子查询
 
 现实中很多情况需要进行下述条件的判断：
 
@@ -314,7 +312,7 @@ SQL-DML既能单一记录操作，也能对记录集合进行批更新操作。
 
 > 三种类型的子查询：（NOT）IN-子查询；$\theta$-Some/$\theta$-All子查询；（NOT）EXISTS子查询。
 
-#### (NOT) IN子查询
+### (NOT) IN子查询
 
 > 基本语法：
 >
@@ -342,7 +340,7 @@ SQL-DML既能单一记录操作，也能对记录集合进行批更新操作。
 
 
 
-#### $\theta$-Some/$\theta$-All子查询
+### $\theta$-Some/$\theta$-All子查询
 
 > 基本语法：
 >
@@ -383,7 +381,7 @@ SQL-DML既能单一记录操作，也能对记录集合进行批更新操作。
 
 
 
-#### (NOT) EXISTS子查询
+### (NOT) EXISTS子查询
 
 > 基本语法：
 >
@@ -416,18 +414,18 @@ SQL-DML既能单一记录操作，也能对记录集合进行批更新操作。
 
 
 
-## SQL语言的结果计算与聚集计算
+### SQL语言的结果计算与聚集计算
 
 
 
-### 结果计算
+#### 结果计算
 
 > Select-From-Where语句中，Select子句后面不仅可是列名，而且可是一些计算表达式或聚集函数，表明再投影的同时直接进行一些运算
 >
 > ```sql
 > Select 列名|expr|agfunc(列名) [[, 列名|expr|agfunc(列名)]...]
 > From 表名1 [,表名2...]
-> [Where 检索条件]
+> [Where 检索条件];
 > ```
 >
 > * expr可以是常量、列名或由常量、列名、特殊函数及算术运算符构成的算术运算式。特殊函数的使用需要结合子DBMS的说明书。
@@ -450,7 +448,7 @@ From Student S;
 
 
 
-### 聚集函数
+#### 聚集函数
 
 > * SQL提供了5个作用再简单列值集合上的内置聚集函数agfunc，分别是：
 >
@@ -471,9 +469,316 @@ Where C.Cname='数据库' and C.Cnumber = SC.Cnumber
 
 
 
-### 分组查询与分组过滤
+#### 分组查询与分组过滤
+
+**分组**：SQL可以将检索到的元组按照某一条件进行分类，具有相同条件值的元组划到一个组或一个集合中，同时处理多个组或集合的聚集运算。
+
+> 基本语法：
+>
+> ```sql
+> Select 列名|expr|agfunc(列名) [[, 列名|expr|agfunc(列名)]...]
+> From 表名1 [,表名2...]
+> [Where 检索条件]
+> [Group by 分组条件];
+> ```
+>
+> 分组条件可以是
+>
+> * 列名1，列名2 ...
+>
+> 示例：求每个学生的平均成绩
+>
+> ```sql
+> Select Snumber, AVG(Score) From SC Group by Snumber;
+> --按照学号进行分组，即学号相同的元组划到一个组中并求平均值。
+> ```
+>
+> 求每一门课程的平均成绩
+>
+> ```sql
+> Select Cnumber, AVG(Score) From SC Group by Cnumber;
+> --按照课程号进行分组，即课程号相同的元组划到一个组中并求平均值。
+> ```
+
+聚集函数是不允许用于Where子句中的：Where子句是对每一元组进行条件过滤，而不是对集合进行条件过滤。
+
+分组过滤：若要对集合（分组）进行条件过滤，即满足条件的集合/分组留下，不满足条件的集合/分组剔除。
+
+> **Having子句，又称分组过滤子句。**需要Group by子句支持，换句话没有Group by子句，便不能有Having子句。
+>
+> ```sql
+> Select 列名|expr|agfunc(列名) [[, 列名|expr|agfunc(列名)]...]
+> From 表名1 [,表名2...]
+> [Where 检索条件]
+> [Group by 分组条件 [Having 分组过滤条件]];
+> ```
+>
+> 示例：求不及格课程超过两门的同学的学号
+>
+> ```sql
+> Select Snumber From SC
+> Where Score < 60
+> Group by Snumber Having Count(*) > 2;
+> ```
+
+**Where子句中不能出现求最大求最小统计相关的东西。**
+
+> 求有两门以上不及格课程同学的学号及其平均成绩
+>
+> ```sql
+> Select Snumber, AVG(Score) From SC
+> Where Snumber in --找出符合条件的学生学号
+> 	(Select Snumber From SC
+>      Where Score < 60
+>      Group by Snumber Having Count(*)>2)
+> Group by Snumber;--通过学号分组计算
+> ```
 
 
+
+### SQL语言实现关系代数操作
+
+
+
+#### 并-交-差的处理
+
+> SQL语言：并运算UNION，交运算INTERSECT，差运算EXCEPT。
+>
+> 基本语法形式：
+>
+> ```sql
+> 子查询 {Union [ALL] | Intersect [ALL] | Except [ALL] 子查询}
+> ```
+>
+> 通常情况下自动删除重复元组（不带ALL）。若要保留重复元组，则需要带ALL。	
+
+示例：求学过002号课或003号课的同学的学号。
+
+```sql
+Select Snumber From SC Where Cnumber='002'
+UNION
+Select Snumber From SC Where Cnumber='003';
+--或
+Select Snumber From SC Where Cnumber='002' or Cnumber='003'; 
+```
+
+但有时也不能完全转换成不用UNION的方式
+
+如，已知两个表Customers（CID，Cname，City，Discnt），Agents（AID，Aname，City，Percent）求客户所在的或者代理商所在的城市。
+
+```sql
+Select City From Customers
+UNION
+Select City From SC Where Agents;
+```
+
+#### SQL语言的空值处理
+
+> 空值是其值步子到、不确定、不存在的值；
+>
+> 数据库中有了空值，会影响许多方面，如影响聚集函数运算的正确性，不能参与算术、比较或逻辑运算等。
+>
+> 在SQL标准中，空值被用一种特殊的符号Null来标记，使用特殊的空值检测函数来获得某列的值是否为空值。
+>
+> 空值检测： is [not] null （测试指定列的值是否为空值）
+
+示例：找出年龄值为空的学生姓名
+
+```sql
+Select Sname From Student Where Sage is null;
+--为什么不写成=null，因为null不能进行运算和比较。
+```
+
+先行DBMS的空值处理方案：
+
+> * 除is [not] null之外，空值不满足任何查找条件；
+> * 如果null参与算术运算，则该算术表达式的值为null；
+> * 如果null参与比较运算，则结果可视为false，部分可以看成unknown；
+> * 如果null参与聚集运算，则除count(*)之外其他聚集函数都忽略null。
+
+
+
+#### 内连接与外连接
+
+> 关系代数中，有连接运算，又分为$\theta$连接和外连接
+>
+> 标准SQL语言中连接通常是采用
+>
+> ```sql
+> Select 列名 [[, 列名]...]
+> From 表名1,表名2, ...
+> [Where 检索条件];
+> ```
+>
+> 即相当于采用$$\pi_{列名,...,列名}(\sigma_{检索条件}(表名1\times 表名2\times ...))$$  。
+
+SQL的高空语法中引入了内连接于外连接运算，具体形式：
+
+> ```sql
+> Select 列名 [[, 列名]...]
+> From 表名1[NATURAL] 
+> 		 [INNER | {LEFT|RIGHT|FULL} [OUTER]] JOIN 表名2
+> 	{ON 连接条件|Using (Colname{,Colname ...})}
+> [Where 检索条件];
+> ```
+>
+> 上书的连接运算有两部分构成：连接类型和连接条件
+>
+> | 连接类型（四选一） |     连接条件（三选一）      |
+> | :----------------: | :-------------------------: |
+> |     inner join     |           natural           |
+> |  left outer join   |        on <连接条件>        |
+> |  right outer join  | using(Col1, Col2, ...,Coln) |
+> |  full outer join   |              /              |
+
+
+
+* Inner Join：即关系代数中的$\theta$-连接运算。
+* Left Outer Join， Right Outer Join， Full Outer Join：即关系代数中的外连接运算。
+
+> （1）连接中使用 natural
+>
+> 出现在结果关系中的两个连接关系在公共属性上取值相等，且公共属性只出现一次。
+>
+> （2）连接中使用 on<连接事件>
+>
+> 出现在结果关系中的两个连接关系的原则取值满足连接条件，且公共属性出现两次。
+>
+> （3）连接中使用 using(Col1, Col2, ...,Coln)
+>
+> (Col1, Col2, ...,Coln)是两个连接关系的公共属性的子集，元组在(Col1, Col2, ...,Coln)上取值相等，且(Col1, Col2, ...,Coln)只出现一次。
+
+示例：求所有教师的任课情况并按教师号排序（没有课程的教师也需要列在表中）
+
+```sql
+--（Inner Join ）错误的 因为会丢失没有课程的老师
+Select Teacher.Tnumber, Tname, Cname 
+From Teacher Inner Join Course 
+	ON Teacher.Tnumber = Course.Tnumber
+Order By Teacher.Tnumber ASC;
+
+--（Left Outer Join ）左连接不会丢失没有课程的老师
+Select Teacher.Tnumber, Tname, Cname 
+From Teacher Left Outer Join Course 
+	ON Teacher.Tnumber = Course.Tnumber
+Order By Teacher.Tnumber ASC;
+```
+
+
+
+## SQL语言之视图及其应用
+
+三级模式两层映像结构
+
+> 对应概念模式的数据在SQL中被称为**基本表（Table）**，而对应外模式的数据称为视图（View）。**视图不仅包含外模式，而且还包含其E-C映像。**
+
+### SQL数据库结构-视图
+
+* 基本表是实际存储于存储文件中的表，基本表中的数据是需要存储的。
+* 视图在SQL中只存储其由基本表到处视图所需要的公式，即由基本表产生视图的影响信息，其数据并补存储，而是在运行过程中动态产生与维护的。
+* 对视图数据的更改最终要反应在对基本表的更改上。
+
+#### 视图的定义
+
+视图需要“先定义，再使用”，视图的**定义**：
+
+> 定义视图：
+>
+> ```sql
+> Create view 视图名 [[, 列名]...]
+> 	as 子查询 [with check option];
+> ```
+>
+> * 如果视图的属性名缺省，则默认为子查询结果中的属性名；也可以显示知名其所拥有的列名。
+> * with check option 指明当对视图进行insert、update、delete时，要检测进行的对应操作的元组是否满足视图定义中子查询定义的条件表达式。
+
+示例：定义一个视图CompStud为计算机系的学生，通过该视图可以将Student表中其他系的学生屏蔽掉。
+
+```sql
+Create View CompStud AS
+	(Select * From Student 
+     Where Dnumber in (Select Dnumber From Dept 
+                       Where Dname='计算机' ));
+```
+
+示例：定义一个视图Teach为教师任课的情况，吧Teacher表中的个人隐私方面的信息，如工资等屏蔽掉，仅反应其教纳闷可学分多少。
+
+```sql
+Create View Teach AS 
+	(Select T.Tname C.Cname Credit
+    	From Teacher T, Course C
+    	Where T.Tnumber = C.Tnumber);
+```
+
+#### 视图的查询
+
+**使用视图：定义号的视图，可以像Table一样，再SQL各种语句中使用。**
+
+示例检索主讲数据库课程的教师姓名，我们可以适应Teach。
+
+```sql
+Select T.Tname From Teach T
+Where T.Cname='数据库';
+```
+
+==对视图查询的本质实际上是将对视图的查询转化成对应的基本表的查询。==
+
+#### 视图的更新
+
+SQL视图的更细是比较复杂的问题，因视图不保存数据，对视图的更新最终要反映到对基本表的更新上，而有时，视图定义的映射是不可逆的。
+
+**示例1**：
+
+```sql
+Create View S_G(Snumber, Savg)
+	AS (Select Snumber, AVG(Score)
+       	From SC Group by Snumber);
+```
+
+如何要进行下面的更新操作？
+
+```sql
+Update S_G Set Savg = 85 Where Snumber='98030101';
+```
+
+显然上述映射是不可逆的，是无法通过视图对基本表进行更新的，所以无法实现。
+
+**示例2**：
+
+```sql
+Create View ClassStud(Sname,Sclass)
+	AS (Select Sname, Sclass From Student);
+```
+
+如何进行下面的更新操作？
+
+```sql
+Insert Into ClassStud Values ('张三', '980301');
+```
+
+上述更新操作仍然是不可实现的，因为缺少Student的主键Snumber。
+
+SQL视图更新的可执行性
+
+> * 如果视图的select目标列包含聚集函数，则不能更新。
+> * 如果视图的select子句中适应了unique或distinct，则不能更新。
+> * 如果视图中包括了group by子句，则不能更新。
+> * 如果视图中包括精算术表达式计算出来的列，则不能更新。
+>
+> 对于由单一Table子集构成的视图，即如果视图时从单个基本表使用选择、投影操作到处的，并且包含了基本表的主键，则可以更新。
+
+
+
+#### 视图的撤销
+
+```sql
+--撤销视图
+Drop View 视图名;
+```
+
+
+
+## 数据库的完整性及完整性约束
 
 
 
