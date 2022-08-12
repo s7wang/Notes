@@ -780,9 +780,358 @@ Drop View 视图名;
 
 ## 数据库的完整性及完整性约束
 
+数据库完整性（DB Integrity）是指DBMS应保证DB的一种特性——在任何情况下的正确性、有效性和一致性。
+
+> 广义完整性：语义完整性、并发控制、安全控制、DB故障恢复等。
+>
+> 狭义完整性：专指语义完整性，DBMS通常有专门的完整性管理机制与程序来处理语义完整性问题。
+
+数据库完整性管理的作用：
+
+> * 防止和避免数据库中不合理数据的出现
+> * DBMS应尽可能地自动防止DB中语义不合理现象
+
+完整性约束条件（完整性约束规则）的一般形式
+
+> **Integrity Constraint ::= (O, P, A, R)**
+>
+> * O:数据集合：约束的对象？
+> * P:谓词条件：什么样的约束？
+> * A:触发条件：什么时候检测？
+> * R:响应动作：不满足时怎么办？
+
+### 数据库完整性分类
+
+**按约束对象分类**
+
+* 域完整性约束条件
+
+> 施加于某一列上，对于给定列上所要更新的某一后选址是否可以接受进行约束条件判断，这是独立进行的。（说人话，约束每一列的取值）
+
+* 关系完整性约束条件
+
+> 施加于关系/table上，对于给定table上所要更新的某一候选元组时否可以接收进行约束条件判断，或是对一个关系中的若干元组和另一个关系中的若干元组间的联系是否可以接受进行约束条件判断。（说人话，同一行不同列之间的值可能会存在某种约束关系）
 
 
 
+**按约束来源分类**
+
+* 结构约束
+
+> 来自于模型的约束，例如函数依赖约束、主键约束（实体完整性）、外键约束（参照完整性），只关心数值相等与否、是否允许空值等；
+
+* 内容约束
+
+> 来自于用户的约束，如用户自定义完整性，关心元组或属性的取值范围。例如：Student表中的Sage属性值在15和40之间等。
+
+
+
+**按约束状态分类**
+
+* 静态约束
+
+> 要求DB在任一时候均满足的约束；例如Sage在任何时候都应该大于0而小于150.
+
+* 动态约束
+
+> 要求DB从一状态变为另一状态时应满足的约束；例如工资只能升，不能降。
+
+
+
+**SQL语言支持如下几种约束**
+
+* 静态约束
+
+> 列完整性——域完整性约束
+>
+> 表完整性——关系完整性约束
+
+* 动态约束
+
+> 触发器
+
+
+
+### SQL语言实现数据库的静态完整性
+
+静态约束形式：
+
+```txt
+Integrity Constraint ::= (O, P, A, R)
+O:列或者表
+P:需要定义
+A:更新时检查（默认）
+R:拒绝（默认）
+```
+
+在SQL中使用`Create Table`实现静态约束的定义，`Create Table`有三种功能：定义关系模式、**定义完整性约束**和定义物理存储特性。
+
+> 定义完整性约束条件：
+>
+> * 列完整性
+> * 表完整性
+
+```SQL
+CREATE TABLE 表名
+( (列名 数据类型 [DEFAULT{default_constant|NULL}] 
+   		[col_constr{col_constr ...}] |,table_constr 
+  {,{列名 数据类型 [DEFAULT{default_constant|NULL}] 
+   		[col_constr{col_constr ...}] |,table_constr}
+   }));
+   
+--col_constr：列约束
+--table_constr：表约束
+```
+
+#### Col_constr列约束
+
+一种约束类型，对单一列的值进行约束
+
+```sql
+{NOT NULL|							--列值非空
+	[CONSTRAINT constraintname]		--为约束名，以便后续撤销
+	{UNIQUE							--列值唯一
+	 |PRIMARY KEY					--列为主键
+	 |CHECK(search_cond)			--列值满足条件，条件只能使用当前列值
+	 |REFERENCES tablename [(colname)] --定义为外键，指向另一个表的某一列
+	 	[ON DELETE{CASCADE|SET NULL}] } }
+--引用另一表tablename的列colname的值，如果有ON DELETE CASCADE或ON DELETE SET NULL语句，则删除被引用表的某列值v时，要将本表该列值为v的行删除或列值更新为null，缺省为无操作。
+```
+
+**Col_constr列约束**：只能应用在单一列上，其后面的约束如UNIQUE，PRIMARY KEY及search_cond只能是单一列唯一、单一列为主键、单一列相关。
+
+示例：假设Ssex只能取{“男”，“女”}，1<= Sage<=150，Dnumber是外键。
+
+```sql
+CREATE TABLE Student(Snumber char(8) not null unique, Sname char(10), 
+	Ssex char(2) CONSTRAINT ctssex CHECK (Ssex="男" or Ssex="女"),
+    Sage integer CHECK(Sage>=1 and Sage<150),
+    Dnumber char(2) REFERENCES Dept(Dnumber) ON DELETE CASCADE,
+    Sclass char(6));
+```
+
+
+
+#### Table_constr表约束
+
+一种关系约束类型，对多列或元组的值进行约束
+
+
+
+```sql
+[CONSTRAINT constraintname]		--为约束名，以便后续撤销
+	{UNIQUE	(colname{,colname...})	--几列混合在一起的值是唯一的
+	 |PRIMARY KEY (colname{,colname...}) --几列联合为主键
+	 |CHECK(search_cond) --元组多列值共同满足条件，仅为同一元组的不同列值
+     |FOREIGN KEY (colname{,colname...}) --定义为外键，指向另一个表的某一列
+	 |REFERENCES tablename [(colname{,colname...})] 
+	 	[ON DELETE CASCADE] }
+```
+
+**Table_constr列约束**：是应用在关系上，及对关系的多元或元组进行约束，列约束时其特例。
+
+示例：在上面基础上添加表约束，Snumber为主键。
+
+```sql
+CREATE TABLE Student(Snumber char(8) not null unique, Sname char(10), 
+	Ssex char(2) CONSTRAINT ctssex CHECK (Ssex="男" or Ssex="女"),
+    Sage integer CHECK(Sage>=1 and Sage<150),
+    Dnumber char(2) REFERENCES Dept(Dnumber) ON DELETE CASCADE,
+    Sclass char(6)，
+    
+    PRIMARY KEY (Snumber));
+```
+
+#### Create Table
+
+示例：CHECK种的条件可以是SELECT-FROM-WHERE内任何WHERE后的语句，包含了子查询。
+
+```sql
+CREATE TABLE SC
+	(Snumber char(8) CHECK(Snumber IN (SELECT Snumber FROM Student)), 
+     Cnumber char(3) CHECK(Cnumber IN (SELECT Cnumber FROM Course)), 
+     Score float(1) CONSTRAINT ctscore CHECK (Score>=0.0 and Score<=100.0));
+--前两个CHECK相当外键的效果     
+```
+
+Create Table中定义的表约束可以在以后根据需要进行册小或追加。撤销或最佳约束的语句时Alter Table（不同系统可能存在差异）
+
+```sql
+ALTER TABLE tblname
+	[ADD ({colname datatype [DEFAULT{default_const|NULL}]
+          [col_constr{col_constr...}] |,table_constr}
+          {, col_name ...}) ]
+    [DROP {COLUMN colname|(colname{,colname...})}]
+    [MODIFY(colname datatype
+           [DEFAULT {default_const|NULL}] [[NOT] NULL]
+           {,colname...} )]
+	[ADD CONSTRAINT constr_name] 
+    [DROP CONSTRAINT constr_name]
+    [DROP PRIMARY KEY];
+```
+
+示例：撤销SC表中ctscore约束（未命名的约束是不能撤销的）
+
+```sql
+ALTER TABLE SC
+	DROP CONSTAINT ctscore;
+```
+
+示例：若要再对SC表中的score进行约束，比如分数在0-150之间，则可新增加一个约束。在Oracle中增加新约束，需要通过修改列的定义来完成
+
+```sql
+ALTER TABLE SC
+	MODIFY(Score float(1) CONSTRAINT nctscore CHECK(Score>=0.0 and Score<=150) );
+```
+
+有些DBMS支持独立追加约束，注意书写格式可能有差异，示例：
+
+```sql
+ALTER TABLE SC
+	ADD CONSTRAINT nctscore CHECK(Score>=0.0 and Score<=150) );
+```
+
+
+
+#### 断言ASSERTION
+
+> * 一个断言就是一个谓词表达式，它表达了希望数据库总能满足的条件；
+> * 表约束和列约束就是一些特殊的断言；
+> * SQL还提供了复杂表达的断言。其语法形式为：
+>
+> ```sql
+> CREATE ASSERTION<assertion-name> CHECK<predicate>
+> ```
+>
+> * 当一个断言创建后，系统将检测器有效性，并在每一次更新中测试更新是否违反改断言。
+
+**断言测试增加了数据库维护的负担，小心使用复杂的断言。**
+
+示例：
+
+> TABLE:
+>
+> borrower(customer_name,loan_number,...)  //客户及其贷款
+>
+> account(account_number,...,balance)  //账户及其余额
+>
+> depositor(account_number, customer_name) //客户及其账户
+>
+> loan(loan_number, amount) //每一笔贷款
+
+“每一笔贷款，要求至少一位借款者账户中存有最低数目的余额，如1000元。”
+
+```sql
+CREATE ASSERTION balance CONSTRAINT CHECK
+	(NOT EXISTS(
+    	SELECT * FROM loan
+    	WHERE NOT EXISTS(
+        	SELECT * FROM borrower, depositor, account
+        	WHERE loan.loan_number=borrower.loan_number
+        		AND borrower.customer_name=depositor.customer_name
+        		AND depositor.account_number=account.account_number
+        		AND account.account_number>=1000 )));
+```
+
+### SQL语言实现数据库的动态完整性
+
+SQL语言实现数据库的静态完整性，需要通过触发器来实现，其约束形式如下：
+
+```txt
+Integrity Constraint ::= (O, P, A, R)
+O:需要定义
+P:需要定义
+A:需要定义
+R:需要定义
+```
+
+#### 触发器Trigger
+
+Create Table中的表约束和列约束基本上都是静态的约束，也基本上都是对单一列或单一元组的约束（尽管有参照完整性），为实现动态约束以及多个元组之间的完整性约束，就需要触发器技术Trigger。
+
+> **Trigger**是一种过程完整性约束（相比之下啊，Create Table中定义的都是非过程性约束），是一段程序，该程序可以在特定的时刻被自动触发执行，比如再一次更新操作之前执行，或在更新操作之后执行。
+
+基本语法：
+
+```sql
+CREATE TRIGGER trigger_name BEFORE|AFTER
+	{INSERT|DELETE|UPDATE [OF colname{,colname...}]}
+	ON tablename [REFERENCING corr_name_def{,corr_name_def ...}]
+	[FOR EACH ROW|FOR EEACH STATEMENT]--[对更新操作的每一条结果|整个更新操作完成]
+	[WHEN (search_condition)]
+		{statement
+		 |BEGIN ATOMIC statement;{statement;...} END}
+--FOR EACH ROW：对每一行；FOR EEACH STATEMENT对每一条SQL语句。
+```
+
+触发器Trigger意义：当某一时间发生（Before|After），对该事件产生的结果（或是每一元组，或者是整个操作的所有元组），检查条件search_condition，如果满足条件，则执行后面对程序。条件或程序段中引用的变量可用corr_name_def来限定。
+
+
+
+事件：`BEFORE|AFTER{INSERT|DELETE|UPDATE...}` 
+
+* 当一个事件（INSERT|DELETE|UPDATE）发生之前Before或发生之后After触发
+* 操作发生，执行触发器操作需要处理两组值：更新前的值和更新后的值，这两个值由corr_name_def的使用来区分
+
+>* corr_name_def的定义
+>
+>```sql
+>{ OLD [ROW] [AS] old_row_corr_name --更新前的旧元组命名别名为
+>| NEW [ROW] [AS] new_row_corr_name --更新后的新元组命名别名为
+>| OLD TABLE [AS] old_table_corr_name --更新前的旧Table命名别名为
+>| NEW TABLE [AS] new_table_corr_name --更新后的新Table命名别名为
+>}
+>```
+>
+>* corr_name_def将在检测条件或后面的动作程序段中被引用处理。
+
+
+
+示例一：设计一个触发器当进行Teacher表更新元组时，使其工资只能升不能降
+
+```sql
+CREATE TRIGGER teacher_chgsal BEFORE UPDATE OF salary
+	ON Teacher
+	REFERENCING NEW x, OLD y
+	FOR EACH ROW WHEN(x.Salary<y.Salary)
+		BEGIN 
+	raise_application_error(-20003,'invalid salary on update');
+	--词条语句为Oracle的错误处理函数
+		END;
+--#################################################
+Integrity Constraint ::= (O, P, A, R)
+O:约束对象为Teacher表中的Salary对象
+P:谓词是x.Salary<y.Salary
+A:触发时间 BEFORE UPDATE 更新前
+R:触发动作，BEGIN和END闭包内容
+```
+
+示例二：假设Student（Snumber，Sname， SumCourse），SumCourse为该同学已学习课程的门数，初始值为0，以后每选修一门都要对其增1，设计一个触发器自动完成上述功能。
+
+```sql
+CREATE TRIGGER sumc AFTER INSERT ON SC
+	REFERENCING NEW ROW newi
+	FOR EACH ROW
+		BEGIN
+	UPDATE Student SET SumCourse=SumCourse+1
+	WHERE Snumber=:newi.Snumber;
+		END;
+```
+
+示例三：假如Student（Snumber，Sname，Sage，Ssex，Sclass）中某一学生要变更其主码Snumber的值，如使原来的98030101变更为98030131，此时SC表中该同学已选课记录的Snumber也需要随其改变。设计一个触发器完成上述功能
+
+```sql
+CREATE TRIGGER updSnumber AFTER UPDATE OF Snumber ON Student
+	REFERENCING OLD oldi, NEW newi
+	FOR EACH ROW
+		BEGIN
+	UPDATE SC SET Snumber=newi.Snumber WHERE Snumber=oldi.Snumber;
+		END;
+```
+
+
+
+## 数据库的安全性
 
 
 
