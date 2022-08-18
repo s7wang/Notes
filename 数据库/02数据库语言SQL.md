@@ -1182,15 +1182,101 @@ DBMS将权利和用户（账户）结合在一起，形成一个访问规则表�
 
 第一种：存储矩阵
 
-存储矩阵：每行代表每个主体S的权限t，每列代表每个对象O的权限t，交叉即可得，对应主体S在对应对象O处得权限t。
+> 存储矩阵：每行代表每个主体S的权限t，每列代表每个对象O的权限t，交叉即可得，对应主体S在对应对象O处得权限t。（没有谓词P，因为加入P后会使结构国务院复杂）。
+
+第二种：视图
+
+> 视图是安全性控制的重要手段，通过视图可以限制用户对关系中某些数据项的存取，例如：
+>
+> ```sql
+> CREATE EmpV1 as SELECT * FROM Employee; --视图1
+> CREATE EmpV2 as SELECT Pname, Dnumber FROM Employee; --视图2
+> ```
+>
+> 通过视图可将数据访问对象与谓词结合起来，限制用户对关系中某些元组的存取，例如：
+>
+> ```sql
+> CREATE EmpV3 as SELECT * FROM Employee WHERE Pnumber=:UserId; --视图3
+> CREATE EmpV4 as SELECT * FROM Employee WHERE Head=:UserId; --视图4
+> --这里的WHERE负责实现谓词的功能
+> ```
 
 
 
+**SQL的安全控制：**
+
+> * SQL语言包含了DDL，DML和DCL。数据库安全控制是属于DCL范畴
+> * 授权机制---自主安全性；视图的运用
+>
+> 关系级别（普通用户）<-- 账户级别（程序员用户）<--超级用户（DBA）
+>
+> * （级别1）Select：读
+> * （级别2）Modify：更新
+>   * Insert：插入
+>   * Update：更新
+>   * Delete：删除
+> * （级别3）Create：创建（创建表空间、模式、表、索引、视图等）
+>   * Create：创建
+>   * Alter：更新
+>   * Drop：删除
+>
+> 级别搞的权力自动包含级别低的权力。
 
 
 
+**授权命令**
+
+```sql
+GRANT {all PRIVILEGES|privilege {,privilege ...}}
+	ON [TABLE] tablename|viewname
+	TO {public|user-id {, user-id}}
+	[WITH GRANT OPTION];
+-- user-id，某一用户账户，由DBA创建的合法账户
+-- public，允许所有有效用户使用授予的权利
+--privilege是下面的权利：
+--  SELECT|INSERT|UPDATE|DELETE|ALL PRIVILEGES
+--WITH GRANT OPTION选项是允许被授权者传播这些权利。
+```
+
+**收回授权命令**
+
+```sql
+REVOKE {all PRIVILEGES|privilege {,privilege ...}} 
+	ON tablename|viewname
+	FROM {public|user-id {, user-id}}
+
+--实例：
+REVOKE SELECT ON employee FROM UserB;
+```
 
 
+
+### 自主安全性的授权过程
+
+**授权过程**
+
+> * **第一步：由DBA创建DB，并为每一个用户创建一个账户：**
+>
+>   假定建立了五个用户：UserA，UserB，UserC，UserD，UserE。
+>
+> * **第二步：DBA授予某用户账户级别的权利：**
+>
+>   假定授予UserA。
+>
+> * **第三步：具有账户级别的用户可以创建基本表或视图，它也自动成为该表或该视图的属主账户，拥有该表或该视图的所有访问权利：**
+>
+>   假定UserA创建了Employee，则UserA就是Employee表的属主账户。
+>
+> * **第四步：拥有属主账户的用户可以将其中一部分权利授予另外的用户，该用户也可以将权利进一步授权给其他的用户：**
+>
+>   假定UserA将读权限授予UserB，而UserB又将其拥有的权限授予UserC，如此将权利不断传递下去。
+
+**注意授权的传播范围：**
+
+> * 传播范围包括两个方面：水平传播数量和垂直传播数量
+>   * 水平传播数量是授权者的再授权用户数目（树的广度）；
+>   * 垂直传播数量是授权者传播给被授权者，再被传播给另一个被授权者...（树的深度）。
+> * 有些系统提供了传播范围控制，有些并没有提供，SQL标准中也没有限制。
 
 
 
