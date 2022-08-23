@@ -14,11 +14,11 @@ Docker 引擎由许多专用的工具协同工作，从而可以创建和运行�
 
 Docker 引擎由如下主要的组件构成：Docker 客户端（Docker Client）、Docker 守护进程（Docker daemon）、containerd 以及 runc。它们共同负责容器的创建和运行。总体逻辑如下图所示。
 
-![Docker引擎](C:\Users\wangs7\Documents\Markdown笔记\Linux\Docker\assets\Docker引擎.png)
+![Docker引擎](.\assets\Docker引擎.png)
 
 
 
-![OCI计划docker](C:\Users\wangs7\Documents\Markdown笔记\Linux\Docker\assets\OCI计划docker.png)
+![OCI计划docker](.\assets\OCI计划docker.png)
 
 * **开放容器计划（OCI）的影响**
   当 Docker 公司正在进行 Docker daemon 进程的拆解和重构的时候，OCI 也正在着手定义两个容器相关的规范（或者说标准）。镜像规范和容器运行时规范，两个规范均于 2017 年 7 月发布了 1.0 版。Docker 公司参与了这些规范的制定工作，并贡献了许多的代码。从 Docker 1.11 版本（2016 年初）开始，Docker 引擎尽可能实现了 OCI 的规范。例如，Docker daemon 不再包含任何容器运行时的代码——所有的容器运行代码在一个单独的 OCI 兼容层中实现。默认情况下，Docker 使用 runc 来实现这一点。runc 是 OCI 容器运行时标准的参考实现。如上图中的 runc 容器运行时层。runc 项目的目标之一就是与 OCI 规范保持一致。目前 OCI 规范均为 1.0 版本，我们不希望它们频繁地迭代，毕竟稳定胜于一切。除此之外，Docker 引擎中的 containerd 组件确保了 Docker 镜像能够以正确的 OCI Bundle 的格式传递给 runc。其实，在 OCI 规范以 1.0 版本正式发布之前，Docker 引擎就已经遵循该规范实现了部分功能。
