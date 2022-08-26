@@ -1339,19 +1339,239 @@ REVOKE SELECT ON employee FROM UserB;
 
 
 
+示例：交互式SQL语言
+
+```sql
+SELECT Sname, Sage FROM Student WHERE Sname='张三';
+```
+
+示例：嵌入式SQL语言
+
+```c
+exec sql select Sname, Sage into :vSname, :vSage from  Student where Sname='张三';
+```
+
+* 典型特点
+
+> --- exec sql 引导 SQL 语句：提供给C编译器，一边对于SQL语句预编译成C编译器可识别的语句。
+>
+> --- 增加一个 into 子句：该句子用于指出接收SQL语句检索结果的程序变量。
+>
+> --- 由冒号引导的程序变量，如：`:vSname`、`:vSaghe`。
+>
+> ---- 其他。
 
 
 
+高级语言、嵌入式SQL语、DBMS、DB之间的联系：
+
+> * 问题1：高级语言如何连接数据库和断开连接？
+> * 问题2：如何将高级语言程序的变量传递给嵌入式SQL语句？
+> * 问题3：嵌入式SQL语句如何被DBMS执行？
+> * 问题4：如何将SQL检索到的结果传递回高级语言程序进行处理？
+> * 问题5：静态SQL语句中的常量如何更换为变量？
+> * 问题6：高级语言程序如何知道SQL语句的执行状态，是否发生错误？
+> * 问题7：动态SQL，如何依据条件动态构造SQL语句，但欲访问的表名和字段名对编程者是**已**知的？
+> * 问题7：动态SQL，如何依据条件动态构造SQL语句，但欲访问的表名和字段名对编程者是**未**知的？
 
 
 
+### 变量声明与数据库连接
+
+* 问题1：高级语言如何连接数据库和断开连接？
+* 问题2：如何将高级语言程序的变量传递给嵌入式SQL语句？
+
+#### 变量声明
+
+在嵌入式SQL语句中可以出现宿主语言所使用的变量：
+
+```c
+exec sql select Sname, Sage into :vSname, :vSage 
+    from  Student where Sname=:specName;
+```
+
+这些变量需要特殊声明
+
+```c
+exec sql begin declare section;
+	char vSname[10], specName[10] = "张三";
+	int vSage;
+exec sql end declare section;
+```
+
+变量声明和赋值中，需要注意：
+
+> * 宿主程序的字符串长度硬币字符串类型字段的长度多1；
+> * 宿主程序变量类型与数据库字段类型之间是有些差异的，有些DBMS可支持自动转换，有些不能。
+
+声明的变量可以在宿主程序中赋值，然后传递给SQL语句的Where等子句中，以使用SQL语句能够按照指定的要求（可变化的）进行检索。
 
 
 
+#### 程序与数据库的连接与断开
+
+> * 在嵌入式SQL程序执行前，首先要与数据库进行连接；
+> * 不同DBMS，具体链接语句的语法略有差异；
+> * SQL标准中建议的连接语法为：
+>
+> ```c
+> exec sql connect to ${target-server} as ${connect-name} user ${user-name};
+> //或
+> exec sql connect to default;
+> //Oracle
+> exec sql connect to ${:user_name} identifed by ${:user_pwd};
+> //DB2 UDB
+> exec sql connect to ${mydb} user ${:user_name} using ${:user_pwd};
+> 
+> ```
+>
+> * SQL标准中建议的断开连接语法为：
+>
+> ```c
+> exec sql disconnect ${connect-name};
+> //或
+> exec sql disconnect current;
+> //Oracle
+> exec sql commit release; //exec sql rollback release;
+> //DB2 UDB
+> exec sql connect reset; //exec sql disconnect current;
+> ```
 
 
 
+#### SQL执行的提交与撤销
 
+SQL语句在执行过程中，必须有提交和册小语句才能确认其操作结果。
+
+SQL执行的提交：
+
+```c
+exec sql commit work;
+```
+
+SQL执行的撤销：
+
+```c
+exec sql rollback work；
+```
+
+> 为此，很多DBMS都涉及了捆绑提交/撤销与断开连接在一起的语句，以保证在断开连接之前用户确认提交或撤销先前的工作。
+
+
+
+**事务**
+
+> 概念：
+>
+> * **从应用程序员的角度**：是一个存取或改变数据库内容的程序的一次执行，或者说一条或多条SQL语句的一次执行被看作一个事务。事务一般是由程序员提出，因此有开始和结束，结束前需要提交或撤销。
+> * 在嵌入式SQL程序中，任何一条数据库操作语句都会引发一个新事务的开始，只要该程序当前没有正在处理的事务。而事务的结束是需要程序员通过commit或rollback确认的。
+> * **从DBMS角度**：是数据库管理系统提供的控制数据操作的一种手段，通过这一手段，应用程序员将一系列的数据库操作组合在一起作为一个整体进行操作和控制，一边数据库管理系统能够提供一致性状态转换的保证。
+
+事务的特性：**ACID**——具有ACID性质的若干数据库基本操作的组合被称为事务。
+
+> * **原子性Atomicity**：DBMS能够保证事务的一组更新操作是原子不可分的，即对DB而言，要么全做，要么全不做。
+>
+> * **一致性Consostency**：DBMS保证事务的操作状态是正确的，符合一致性的操作规则，特使进一步由隔离性来保证的。
+> * **隔离性Isolation**：DBMS保证并发执行的多个事务之间互相不受影响。
+> * **持久性Durability**：DBMS保证已经提交的事务的影响是持久的，被撤销事务的影响是可恢复的。
+
+
+
+一段嵌入式SQL的示例：
+
+```c
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+EXEC SQL INCLUDE SQLCA;
+
+int main() {
+	EXEC SQL BEGIN DECLARE SECTION;
+    //获取数据库服务名serv可以执行sql命令 
+    //select global_name from global_name 
+    //或者 select instance_name from v$instance
+    	VARCHAR usr[20],pass[20],serv[20];//usr用户名,pass密码,serv数据库服务名
+        char emp_name[20];
+        int emp_id;
+    EXEC SQL END DECLARE SECTION;
+
+    strcpy(usr.arr,"test01");
+    usr.len=(unsigned short)strlen((char *)usr.arr);
+    strcpy(pass.arr,"111111");
+    pass.len=(unsigned short)strlen((char *)pass.arr);
+    strcpy(serv.arr,"orcl");
+    serv.len=(unsigned short)strlen((char *)serv.arr);
+
+    EXEC SQL CONNECT :usr IDENTIFIED BY :pass USING :serv;
+
+    //判断是否连接到数据库
+    if(sqlca.sqlcode) {
+    	printf("ORA-ERROR: sqlca.sqlcode=%d\n",sqlca.sqlcode);
+        exit(0);
+    }
+
+    printf("Connect!\n");
+
+	printf("please input id:");
+	scanf("%d",&emp_id);
+
+    //查询语句
+	EXEC SQL SELECT emp_id , emp_name into :emp_id,:emp_name from emp where emp_id=:emp_id;
+
+	printf("Name=%s\n", emp_name);
+
+	EXEC SQL COMMIT WORK RELEASE;
+
+	printf("Disconnect!\n");
+
+    return 0;
+}
+```
+
+
+
+### 数据集与游标
+
+* 问题3：嵌入式SQL语句如何被DBMS执行？
+* 问题4：如何将SQL检索到的结果传递回高级语言程序进行处理？
+* 问题5：静态SQL语句中的常量如何更换为变量？
+
+#### 单行与多行数据的处理
+
+检索的单行结果，可以将结果直接传送到宿主程序的变量中。例如：
+
+```c
+exec sql select Sname, Sage into :vSname, :vSage 
+    from  Student where Sname=:specName;
+```
+
+检索多行结果，则需要使用**游标（Cursor）**
+
+> * 游标是指向某检索记录集的指针；
+> * 通过这个指针的移动，每次读一行，处理一行，再读一行，直到处理完毕。
+> * 读取一行操作是通过`Feth...into`语句实现的：每一次Fetch，都是先向下移动指针，然后再读取；
+> * 记录集有结束标识EOF，用来标记后面已没有记录了。
+
+**游标（Cursor）**的使用：
+
+> **游标（Cursor）**的使用需要先定义、再打开（执行）、接着一条接一条处理，最后再关闭。
+
+```c
+//声明游标
+exec sql declare ${cur_student} cursor for 
+    select Sno, Sname, Sclass from Student where Sclass=='035101';
+    
+//打开游标
+exec sql open ${cur_student};
+//执行游标
+exec sql fetch ${cur_student} into :vSno, :vSname, :vSclass;
+... ...
+//关闭游标
+exec sql close ${cur_student};  
+```
+
+游标可以一次定义，多次打开（执行），多次关闭。
 
 
 
