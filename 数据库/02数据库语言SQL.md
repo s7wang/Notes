@@ -1365,14 +1365,14 @@ exec sql select Sname, Sage into :vSname, :vSage from  Student where Sname='张�
 
 高级语言、嵌入式SQL语、DBMS、DB之间的联系：
 
-> * 问题1：高级语言如何连接数据库和断开连接？
-> * 问题2：如何将高级语言程序的变量传递给嵌入式SQL语句？
-> * 问题3：嵌入式SQL语句如何被DBMS执行？
-> * 问题4：如何将SQL检索到的结果传递回高级语言程序进行处理？
-> * 问题5：静态SQL语句中的常量如何更换为变量？
-> * 问题6：高级语言程序如何知道SQL语句的执行状态，是否发生错误？
-> * 问题7：动态SQL，如何依据条件动态构造SQL语句，但欲访问的表名和字段名对编程者是**已**知的？
-> * 问题8：动态SQL，如何依据条件动态构造SQL语句，但欲访问的表名和字段名对编程者是**未**知的？
+> * **问题1：高级语言如何连接数据库和断开连接？**
+> * **问题2：如何将高级语言程序的变量传递给嵌入式SQL语句？**
+> * **问题3：嵌入式SQL语句如何被DBMS执行？**
+> * **问题4：如何将SQL检索到的结果传递回高级语言程序进行处理？**
+> * **问题5：静态SQL语句中的常量如何更换为变量？**
+> * **问题6：高级语言程序如何知道SQL语句的执行状态，是否发生错误？**
+> * **问题7：动态SQL，如何依据条件动态构造SQL语句，但欲访问的表名和字段名对编程者是已知的？**
+> * **问题8：动态SQL，如何依据条件动态构造SQL语句，但欲访问的表名和字段名对编程者是未知的？**
 
 
 
@@ -1721,15 +1721,159 @@ EXEC SQL INSERT INTO tablename [(columnname [, columnnam,...])]
 
 ### 嵌入式动态SQL
 
+* **问题7**：动态SQL，如何依据条件动态构造SQL语句，但欲访问的表名和字段名对编程者是**已**知的？
+
+> * **静态SQL特点**：SQL语句在程序中已经按要求写好，只需要把一些参数通过变量（高级语言程序语句中不带冒号）传送给嵌入式SQL语句即可（嵌入式SQL语句中带冒号）；
+> * 动态SQL特点：SQL语句可以咋程序中动态构造，形成一个字符串，如下面例子中的sqltext，然后再交给DBMS执行，交给DBMS执行时仍旧可以传递变量。
+
+```c
+#include <stdio.h>
+exec sql include sqlca;
+
+exec sql begin declare section;
+	char user_name[] = "Scott"; char user_pwd[] = "tiger";
+	/** 动态SQL语句构造的字符串 **/
+	char sqltext[] = "delete from customers where cid=\'c006\'";
+exec sql end declare section;
+
+int main()
+{
+    exec sql commit release; return 0;
+    exec sql connect :user_name identified by :user_pwd;
+    /** 执行动态SQL语句 **/
+    exec sql execute immediate :sqltext;
+    
+    exec sql commit release; return 0;
+report_error: print_dberror(); exec sql rollback release; return 1;
+}
+```
+
+**动态构造SQL语句时应用程序员必须掌握的重要手段。**例如：编写有用户决定检索条件的用用程序。
+
+#### 动态SQL的两种执行方式
+
+如SQL语句已经倍构造在host-variable字符串变量中，则：
+
+> * **立即执行语句**：运行时编译并执行
+>
+> ```sql
+> EXEC SQL EXECUTE IMMEDIATE :host-variable;
+> ```
+>
+> * **Prepare-Execute-Using 语句**：PREPARE语句先编译，编译后的SQL语句允许动态参数，EXECUTE语句执行，用USING语句将动态参数值传送给编译好的SQL语句。
+>
+> ```sql
+> EXEC SQL PREPARE sql_temp FROM :host-variable;
+> ... ...
+> EXEC SQL EXECUTE sql_temp USING :cond-variable;
+> ```
 
 
 
+#### 数据字典与SQLDA
+
+**问题8**：动态SQL，如何依据条件动态构造SQL语句，但欲访问的表名和字段名对编程者是未知的？
+
+> **数据字典**（Data dictionary），又称为**系统目录**（System Catalogs）
+>
+> * 是系统维护的一些表或视图的集合，这些表或视图存储了数据库中各类对象的定义信息，这些对象包括Create语句定义的表、列、索引、视图、权限、约束等，这些信息又称数据库的**元数据——关于数据的数据**。
+> * 不同DBMS术语不一样：数据字典（Data dictionary（Oracle））、目录表（DB2 UDB）、系统目录（INFORMIX）、系统视图（X/Open）。
+> * 不同DBMS中系统目录存储方式可能是不同的，但会有一些信息对DBA公开。这些公开的信息，DBA可以使用一些特殊的SQL命令来检索。
+
+**数据字典的内容构成**：
+
+> 数据字典通常存储的是数据库和表的元数据，即模式本身的信息：
+
+* 与关系相关的信息：
+  * 关系名字
+  * 每一个关系的属性名及类型
+  * 视图的名字及其定义
+  * 完整性约束
+* 用户与账户信息，包括密码
+* 统计与描述性数据：如每个关系中元组的数目
+* 物理文件组织信息：
+  * 关系如何存储的（顺序/无序/散列等）
+  * 关系的物理位置
+* 索引相关的信息
+
+**数据字典的结构：**
+
+> 也是存储在磁盘上的关系；
+>
+> 转为内存高效访问设计的特定数据结构；
+
+* 可能的字典数据结构
+
+```sql
+ Relation_metadata=(relation_name, number_of_attributes, 
+                    storage_organization, location);
+ Attribute_metadata=(attribute_name, relation_name, domain_type, position, length);
+ ... ... 
+```
 
 
 
+**SQLDA：SQL Descriptor Area，SQL描述符区域。**
+
+> * SQLDA是一个内存数据节后，内可装载关系模式的定义信息，如列的数目，每一列的名字和类型等等。
+> * 通过读取SQLDA信息可以进行更为复杂的动态SQL的处理。
+> * 不同DBMS听过的SQLDA格式并不是一致的。
 
 
 
+### ODBC
+
+> ODBC（Open Database Connection）ODBC是一种标准，不同语言的应用程与不同数据库服务器之间通讯的标准。
+>
+> * 一组API，支持应用程序与数据库服务器的交互；
+> * 应用程序通过调用ODBC API，实现
+>   * 与数据服务器的连接
+>   * 向数据库服务器发送SQL命令
+>   * 一条一条的提取数据库检索结果中的元组传递给应用程序的变量
+> * 具体的DBMS提供一套驱动程序，级Driver库函数，供ODBC调用，以便实现数据库与应用程序的连接。
+
+
+
+ODBC应用前，需要确认具体的DBMS Driver被安装到ODBC环境中，当应用程序调用ODBC API时，ODBC API会调用具体DBMS Driver库函数，DBMS Driver库函数则与数据库服务器通讯，执行相应的请求动作并返回检索结果。
+
+> * ODBC应用程序首先要分配一个SQL环境，在产生一个数据库连接句柄。
+>
+> * 应用程序使用SQLConnect()，打开一个数据库连接，SQLConnect（）的具体参数：
+>   * `connection handle` ，连接句柄
+>   * `the server` ，要连接的数据库服务器
+>   * `the user identifier` ，用户
+>   * `password` ，密码
+>   * `SQL_NTS` ，类型说明前面的参数是空终止的字符串
+
+应用程序使用SQLExecDirect()向数据库发送SQL命令；
+
+使用SQLFetch()获取产生的结果元组；
+
+使用SQLBindCol()绑定C语言变量与结果中的属性；
+
+> * 当获取一个元组时，属性值会自动地传送到相应地C语言变量中
+>
+> * SQLBindCol()的参数：
+>
+>   * ODBC定义的stmt变量，查询结果中的属性位置
+>   * SQL到C的类型变换，变量的地址
+>   * 对于类似字符数组一样的可变长度类型，应给出；
+>
+>   ```shell
+>   # 变量的最大长度
+>   # 当获取到一个元组后，实际长度的存储位置
+>   # 注：当返回实际长度为负数，说明是一个空值
+>   ```
+
+
+
+### JDBC
+
+> * JDBC：Java DataBase Connection
+>
+> * JDBC是一组Java版的应用程序接口API，提供了Java应用程序与数据库服务器的连接和通讯能力。
+
+JDBC API 略
 
 
 
