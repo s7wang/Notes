@@ -158,7 +158,7 @@ RTP报文由两部分组成：报头和有效载荷。RTP报头格式其中：
 
 > FU header->Type = NALU头结构->Tpye
 > FU header->S = 开始位,设置成1,指示分片NAL单元的开始,也就是开始包
-> FU header->D = 结束位,设置成1,指示分片NAL单元的结束,也就是尾包
+> FU header->E = 结束位,设置成1,指示分片NAL单元的结束,也就是尾包
 > FU header->R = 保留位必须设置为0
 
 
